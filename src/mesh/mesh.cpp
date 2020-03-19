@@ -1855,6 +1855,13 @@ void Mesh::OutputCycleDiagnostics() {
       std::cout << "cycle=" << ncycle << std::scientific
                 << std::setprecision(dt_precision)
                 << " time=" << time << " dt=" << dt;
+      Mesh *pmesh;
+
+      std::cout << " MeshBlocks: " << Mesh::nbtotal << " ";
+      std::cout << " cells per MeshBlock: " << Mesh::pblock->GetNumberOfMeshBlockCells()  << " ";
+
+
+
       if (dt_diagnostics != -1) {
         if (STS_ENABLED) {
           if (UserTimeStep_ == nullptr)
