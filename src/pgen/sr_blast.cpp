@@ -180,24 +180,51 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
 // refinement condition: check the maximum pressure gradient
 int RefinementCondition(MeshBlock *pmb) {
-  AthenaArray<Real> &w = pmb->phydro->w;
+  AthenaArray<Real> &u = pmb->phydro->u;
+
   Real maxeps = 0.0;
 
-// 3D flag
+  int level = pmb->loc.level;
+  bool Flag=false;
+  bool UnFlag=false;
+
+  double Threshold[20];
+
+  Threshold[0] = 0.00001;
+  Threshold[1] = 0.00005;
+  Threshold[2] = 0.00010;
+  Threshold[3] = 0.00050;
+  Threshold[4] = 0.00100;
+
+  //double Threshold_Lv = Threshold[level];
+  double Threshold_Lv = 0.01;
+  double Threshold_Lv_Derefine = 0.01*Threshold_Lv;
+  double Diff_i, Diff_j,Diff_k;
+
     for (int k=pmb->ks-1; k<=pmb->ke+1; k++) {
       for (int j=pmb->js-1; j<=pmb->je+1; j++) {
         for (int i=pmb->is-1; i<=pmb->ie+1; i++) {
-          Real eps = std::sqrt(SQR(0.5*(w(IPR,k,j,i+1) - w(IPR,k,j,i-1)))
-                               +SQR(0.5*(w(IPR,k,j+1,i) - w(IPR,k,j-1,i)))
-                               +SQR(0.5*(w(IPR,k+1,j,i) - w(IPR,k-1,j,i))))/w(IPR,k,j,i);
-          maxeps = std::max(maxeps, eps);
+
+          Diff_i = fabs( u(IEN,k  ,j  ,i+1) - u(IEN,k  ,j  ,i-1) ) * 0.5  / u(IEN,k,j,i);
+          Diff_j = fabs( u(IEN,k  ,j+1,i  ) - u(IEN,k  ,j-1,i  ) ) * 0.5  / u(IEN,k,j,i);
+          Diff_k = fabs( u(IEN,k+1,j  ,i  ) - u(IEN,k-1,j  ,i  ) ) * 0.5  / u(IEN,k,j,i);
+     
+
+          Flag |= Diff_i > Threshold_Lv;
+          Flag |= Diff_j > Threshold_Lv;
+          Flag |= Diff_k > Threshold_Lv;
+  
+          UnFlag |=  Diff_i  < Threshold_Lv_Derefine;
+          UnFlag |=  Diff_j  < Threshold_Lv_Derefine;
+          UnFlag |=  Diff_k  < Threshold_Lv_Derefine;
         }
       }   
     }   
- 
-  if (maxeps > threshold) return 1;
-  if (maxeps < 0.25*threshold) return -1; 
-  return 0;                                                                                                                              
+
+  if ( Flag )   return 1;
+  if ( UnFlag ) return -1;
+
+  return 0;
 }
 
 
