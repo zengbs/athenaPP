@@ -68,7 +68,7 @@ void SetTable()
              
    Random_Table_NBin = Aux_LoadTable( Random_Data, Random_File, NCol, Col, RowMajor_No, AllocMem_Yes );
 }
-
+extern int counter_tseng;
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   // Prepare index bounds
@@ -86,7 +86,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     kl -= NGHOST;
     ku += NGHOST;
   }
-
+counter_tseng++;
   AthenaArray<Real> b;
   b.NewAthenaArray(3, ncells3, ncells2, ncells1);
 
@@ -95,8 +95,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
 
   double Theta, Phi;
   double Cons_BG[5], Prim_EXP[5], Cons_EXP[5];
-  double Blast_Center[3], RotatedCartesian[3];;
- 
+  double Blast_Center[3], RotatedCartesian[3];
+
   Table_x     = Random_Data + 0*Random_Table_NBin;
   Table_y     = Random_Data + 1*Random_Table_NBin;
   Table_z     = Random_Data + 2*Random_Table_NBin;
@@ -110,9 +110,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     {
       for (int i=il; i<=iu; ++i)  
       {
+        
         Real x = pcoord->x1v(i);
         Real y = pcoord->x2v(j);
         Real z = pcoord->x3v(k);
+
+        bool InsideEllipsoid = false;
 
         for ( int iBlast = 0; iBlast < NumSource; iBlast++ )
         {
@@ -132,27 +135,27 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
            CartesianRotate( RotatedCartesian, Theta, Phi, false );
 
 
-           bool InsideEllipsoid = false;
-           InsideEllipsoid  = SQR ( RotatedCartesian[0] / Blast_Radius_x ) 
-                            + SQR ( RotatedCartesian[1] / Blast_Radius_y ) 
-                            + SQR ( RotatedCartesian[2] / Blast_Radius_z ) < 1.0;
 
-           if ( InsideEllipsoid == true )
-           {
-              phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_EXP[0];
-              phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_EXP[4];
-              phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
-              phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
-              phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
-           }
-           else
-           {
-              phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_BG[0];
-              phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_BG[4];
-              phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
-              phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
-              phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
-           }
+           InsideEllipsoid  |= SQR ( RotatedCartesian[0] / Blast_Radius_x ) 
+                             + SQR ( RotatedCartesian[1] / Blast_Radius_y ) 
+                             + SQR ( RotatedCartesian[2] / Blast_Radius_z ) < 1.0;
+        }
+
+        if ( InsideEllipsoid )
+        {
+           phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_EXP[0];
+           phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_EXP[4];
+           phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
+           phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
+           phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
+        }
+        else
+        {
+           phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_BG[0];
+           phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_BG[4];
+           phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
+           phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
+           phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
         }
       }
     }
