@@ -68,7 +68,6 @@ void SetTable()
              
    Random_Table_NBin = Aux_LoadTable( Random_Data, Random_File, NCol, Col, RowMajor_No, AllocMem_Yes );
 }
-extern int counter_tseng;
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin) {
   // Prepare index bounds
@@ -86,7 +85,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin) {
     kl -= NGHOST;
     ku += NGHOST;
   }
-counter_tseng++;
+
   AthenaArray<Real> b;
   b.NewAthenaArray(3, ncells3, ncells2, ncells1);
 
@@ -115,7 +114,7 @@ counter_tseng++;
         Real y = pcoord->x2v(j);
         Real z = pcoord->x3v(k);
 
-        bool InsideEllipsoid = false;
+        bool InsideEllipsoid[ NumSource ];
 
         for ( int iBlast = 0; iBlast < NumSource; iBlast++ )
         {
@@ -124,7 +123,6 @@ counter_tseng++;
            Blast_Center[2] = Table_z[iBlast];
            Theta           = Table_theta[iBlast];
            Phi             = Table_phi[iBlast];
-           Prim_EXP    [4] = Blast_Dens_Src*Table_Temp[iBlast];
 
 
            //1. rotate ellipsoid
@@ -136,20 +134,32 @@ counter_tseng++;
 
 
 
-           InsideEllipsoid  |= SQR ( RotatedCartesian[0] / Blast_Radius_x ) 
-                             + SQR ( RotatedCartesian[1] / Blast_Radius_y ) 
-                             + SQR ( RotatedCartesian[2] / Blast_Radius_z ) < 1.0;
+           InsideEllipsoid[iBlast] = SQR ( RotatedCartesian[0] / Blast_Radius_x ) 
+                                   + SQR ( RotatedCartesian[1] / Blast_Radius_y ) 
+                                   + SQR ( RotatedCartesian[2] / Blast_Radius_z ) < 1.0;
+
         }
 
-        if ( InsideEllipsoid )
+        bool Inside = false;
+        
+        for ( int iBlast = 0; iBlast < NumSource; iBlast++ )
         {
-           phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_EXP[0];
-           phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_EXP[4];
-           phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
-           phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
-           phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
+           Prim_EXP[4] = Blast_Dens_Src*Table_Temp[iBlast];
+
+           Inside |= InsideEllipsoid[iBlast];
+
+           if ( InsideEllipsoid[iBlast] )
+           {
+              phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_EXP[0];
+              phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_EXP[4];
+              phydro->w(IVX,k,j,i) = phydro->w1(IVX,k,j,i) = 0.0;
+              phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
+              phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
+              continue;
+           }
         }
-        else
+
+        if ( !Inside )
         {
            phydro->w(IDN,k,j,i) = phydro->w1(IDN,k,j,i) = Prim_BG[0];
            phydro->w(IPR,k,j,i) = phydro->w1(IPR,k,j,i) = Prim_BG[4];
@@ -157,6 +167,8 @@ counter_tseng++;
            phydro->w(IVY,k,j,i) = phydro->w1(IVY,k,j,i) = 0.0;
            phydro->w(IVZ,k,j,i) = phydro->w1(IVZ,k,j,i) = 0.0;
         }
+
+
       }
     }
   }
@@ -166,13 +178,12 @@ counter_tseng++;
   return;
 }
 
-
+// refinement condition: check the maximum pressure gradient
 int RefinementCondition(MeshBlock *pmb) {
   AthenaArray<Real> &w = pmb->phydro->w;
   Real maxeps = 0.0;
 
 // 3D flag
-  if (pmb->pmy_mesh->f3) {
     for (int k=pmb->ks-1; k<=pmb->ke+1; k++) {
       for (int j=pmb->js-1; j<=pmb->je+1; j++) {
         for (int i=pmb->is-1; i<=pmb->ie+1; i++) {
@@ -183,19 +194,6 @@ int RefinementCondition(MeshBlock *pmb) {
         }
       }   
     }   
-// 2D flag
-  } else if (pmb->pmy_mesh->f2) {
-    int k = pmb->ks;
-    for (int j=pmb->js-1; j<=pmb->je+1; j++) {
-      for (int i=pmb->is-1; i<=pmb->ie+1; i++) {
-        Real eps = std::sqrt(SQR(0.5*(w(IPR,k,j,i+1) - w(IPR,k,j,i-1)))
-                             + SQR(0.5*(w(IPR,k,j+1,i) - w(IPR,k,j-1,i))))/w(IPR,k,j,i);
-        maxeps = std::max(maxeps, eps);
-      }   
-    }   
-  } else {
-    return 0;
-  }
  
   if (maxeps > threshold) return 1;
   if (maxeps < 0.25*threshold) return -1; 
